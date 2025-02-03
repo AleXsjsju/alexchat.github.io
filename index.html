@@ -1,267 +1,174 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat Dark Mode - Firebase Firestore</title>
-  <link rel="stylesheet" href="styles.css">
-  <!-- Script Firebase -->
-  <script defer src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
-  <style>
-    /* … (includi qui il tuo CSS, lo stesso che hai già) … */
-    body { background-color: #121212; color: #ffffff; font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; }
-    /* ...altro CSS... */
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Dark Mode</title>
+    <link rel="stylesheet" href="styles.css">
+    <script defer src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+        #name-input-screen, #chat-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px;
+        }
+        #name-input-screen {
+            text-align: center;
+        }
+        #chat-container {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            max-width: 1200px;
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
+        #messages {
+            height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            background: #333;
+            border-radius: 5px;
+            padding: 10px;
+        }
+        #messages p {
+            margin: 0;
+            padding: 5px;
+            border-bottom: 1px solid #444;
+        }
+        .message {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .message.mine {
+            justify-content: flex-end;
+        }
+        .message p {
+            max-width: 70%;
+            padding: 10px;
+            border-radius: 5px;
+            background: #444;
+        }
+        .message.mine p {
+            background: #6200ea;
+        }
+        input, button {
+            width: 60%;
+            margin: 10px 0;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+        }
+        button {
+            background: #6200ea;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #3700b3;
+        }
+        .back-button {
+            background: #ff5722;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        .back-button:hover {
+            background: #e64a19;
+        }
+    </style>
 </head>
 <body>
-  <!-- Schermata per inserire il nome -->
-  <div id="name-input-screen">
-    <h2>Inserisci il tuo nome</h2>
-    <input type="text" id="username" placeholder="Nome univoco" />
-    <button id="nextButton">Avanti</button>
-  </div>
-
-  <!-- Interfaccia delle chat -->
-  <div id="chat-container" style="display:none;">
-    <div id="public-chats">
-      <h3>Chat Pubbliche</h3>
-      <ul>
-        <li onclick="joinChat('Chat 1')">Chat 1</li>
-        <li onclick="joinChat('Chat 2')">Chat 2</li>
-        <li onclick="joinChat('Chat 3')">Chat 3</li>
-      </ul>
+    <div id="name-input-screen">
+        <h2>Inserisci il tuo nome e PIN</h2>
+        <input type="text" id="username" placeholder="Nome univoco" />
+        <input type="password" id="pin" placeholder="PIN" />
+        <button id="nextButton">Avanti</button>
     </div>
 
-    <div id="create-private-chat">
-      <h3>Crea Chat Privata</h3>
-      <input type="text" id="private-room-name" placeholder="Nome della stanza" />
-      <input type="password" id="private-room-pin" placeholder="PIN di accesso" />
-      <button id="createChatButton">Crea</button>
+    <div id="chat-container">
+        <div id="messages"></div>
+        <input type="text" id="message-input" placeholder="Scrivi un messaggio..." />
+        <button id="sendMessageButton">Invia</button>
     </div>
 
-    <div id="private-chats">
-      <h3>Chat Private</h3>
-      <ul id="private-chat-list"></ul>
-    </div>
-  </div>
+    <script>
+        const correctPin = '1318'; // PIN fisso
 
-  <!-- Schermata dei messaggi -->
-  <div id="message-input-container" style="display:none;">
-    <button class="back-button" onclick="backToList()">Indietro</button>
-    <div id="messages"></div>
-    <input type="text" id="message-input" placeholder="Scrivi un messaggio..." />
-    <button id="sendMessageButton">Invia</button>
-  </div>
+        document.getElementById("nextButton").addEventListener("click", function () {
+            const username = document.getElementById("username").value.trim();
+            const pin = document.getElementById("pin").value.trim();
 
-  <script>
-    // Inizializzazione Firebase
-    // Sostituisci i valori seguenti con la tua configurazione Firebase
-    const firebaseConfig = {
-      apiKey: "API_KEY",
-      authDomain: "PROJECT_ID.firebaseapp.com",
-      projectId: "PROJECT_ID",
-      storageBucket: "PROJECT_ID.appspot.com",
-      messagingSenderId: "SENDER_ID",
-      appId: "APP_ID"
-    };
+            if (username && pin === correctPin) {
+                localStorage.setItem("username", username);
+                showChatInterface();
+            } else {
+                alert("PIN errato o nome non valido.");
+            }
+        });
 
-    // Inizializza Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    // Gestione utente (stesso codice di prima)
-    window.onload = function () {
-      if (localStorage.getItem("username")) {
-        showChatInterface();
-      }
-    };
-
-    document.getElementById("nextButton").addEventListener("click", function () {
-      const username = document.getElementById("username").value.trim();
-      if (username) {
-        const users = JSON.parse(localStorage.getItem("users")) || [];
-        if (users.includes(username)) {
-          alert("Il nome è già in uso. Scegliene un altro.");
-        } else {
-          users.push(username);
-          localStorage.setItem("users", JSON.stringify(users));
-          localStorage.setItem("username", username);
-          showChatInterface();
+        function showChatInterface() {
+            document.getElementById("name-input-screen").style.display = "none";
+            document.getElementById("chat-container").style.display = "flex";
+            loadMessages();
         }
-      } else {
-        alert("Per favore, inserisci un nome.");
-      }
-    });
 
-    function showChatInterface() {
-      document.getElementById("name-input-screen").style.display = "none";
-      document.getElementById("chat-container").style.display = "flex";
-      loadPrivateChats(); // Carica le chat private già normalizzate
-    }
+        function loadMessages() {
+            const messagesContainer = document.getElementById("messages");
+            const messages = JSON.parse(localStorage.getItem("chatMessages")) || [];
 
-    // Funzione per caricare le chat private (stessa logica di prima)
-    function loadPrivateChats() {
-      const privateChats = JSON.parse(localStorage.getItem("privateChats")) || [];
-      const chatList = document.getElementById("private-chat-list");
-      chatList.innerHTML = "";
-      if (privateChats.length === 0) {
-        chatList.innerHTML = "<li>Non ci sono chat private disponibili.</li>";
-      } else {
-        privateChats.forEach((chat, index) => {
-          const listItem = document.createElement("li");
-          const chatSpan = document.createElement("span");
-          chatSpan.textContent = chat.name;
-          chatSpan.style.cursor = "pointer";
-          chatSpan.onclick = () => joinPrivateChat(chat.name);
-          listItem.appendChild(chatSpan);
+            messagesContainer.innerHTML = "";
 
-          const currentUser = localStorage.getItem("username");
-          if (!chat.createdBy || chat.createdBy === currentUser) {
-            const editBtn = document.createElement("button");
-            editBtn.textContent = "Modifica";
-            editBtn.classList.add("chat-action-btn");
-            editBtn.onclick = (e) => { e.stopPropagation(); editPrivateChat(index); };
-            listItem.appendChild(editBtn);
+            messages.forEach(msg => {
+                const messageElement = document.createElement("div");
+                messageElement.classList.add("message");
 
-            const deleteBtn = document.createElement("button");
-            deleteBtn.textContent = "Elimina";
-            deleteBtn.classList.add("chat-action-btn", "delete");
-            deleteBtn.onclick = (e) => { e.stopPropagation(); deletePrivateChat(index); };
-            listItem.appendChild(deleteBtn);
-          }
-          chatList.appendChild(listItem);
-        });
-      }
-    }
+                const messageText = document.createElement("p");
+                messageText.textContent = `${msg.user}: ${msg.message} - ${msg.time}`;
+                messageElement.appendChild(messageText);
 
-    function joinChat(chatName) {
-      enterChatRoom(chatName);
-    }
+                messagesContainer.appendChild(messageElement);
+            });
 
-    function joinPrivateChat(name) {
-      const enteredPin = prompt("Inserisci il PIN per accedere alla chat privata:");
-      const privateChats = JSON.parse(localStorage.getItem("privateChats")) || [];
-      const chat = privateChats.find(c => c.name === name);
-      if (chat && chat.pin === enteredPin) {
-        enterChatRoom(name);
-      } else {
-        alert("PIN errato.");
-      }
-    }
+            document.getElementById("sendMessageButton").onclick = () => sendMessage();
+        }
 
-    function enterChatRoom(name) {
-      document.getElementById("chat-container").style.display = "none";
-      document.getElementById("message-input-container").style.display = "block";
-      loadMessages(name);
-    }
+        function sendMessage() {
+            const message = document.getElementById("message-input").value.trim();
+            const username = localStorage.getItem("username");
+            if (message) {
+                const time = new Date().toLocaleTimeString();
+                const newMessage = { user: username, message, time };
 
-    // --- FUNZIONI FIRESTORE PER LA GESTIONE DEI MESSAGGI ---
-    let unsubscribe = null; // per fermare il listener quando si esce dalla chat
+                let messages = JSON.parse(localStorage.getItem("chatMessages")) || [];
+                messages.push(newMessage);
+                localStorage.setItem("chatMessages", JSON.stringify(messages));
 
-    function loadMessages(chatName) {
-      const messagesContainer = document.getElementById("messages");
-      messagesContainer.innerHTML = "";
-      const username = localStorage.getItem("username");
-
-      // Se c'è già un listener attivo, lo fermiamo
-      if (unsubscribe) {
-        unsubscribe();
-      }
-
-      // Creiamo un listener in tempo reale per la sottocollezione "messages" della chat
-      unsubscribe = db.collection('chats').doc(chatName)
-        .collection('messages')
-        .orderBy('time')
-        .onSnapshot(snapshot => {
-          messagesContainer.innerHTML = "";
-          snapshot.forEach(doc => {
-            const msg = doc.data();
-            const messageElement = document.createElement("div");
-            messageElement.classList.add("message");
-            if (msg.user === username) messageElement.classList.add("mine");
-
-            const messageText = document.createElement("p");
-            // Formattiamo il timestamp se presente
-            let timeString = msg.time && msg.time.toDate ? msg.time.toDate().toLocaleTimeString() : "";
-            messageText.textContent = `${msg.user}: ${msg.message} ${timeString ? "- " + timeString : ""}`;
-            messageElement.appendChild(messageText);
-            messagesContainer.appendChild(messageElement);
-          });
-          // Scroll automatico verso il basso
-          messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, error => {
-          console.error("Errore nel caricamento dei messaggi:", error);
-        });
-
-      // Impostiamo il pulsante per inviare i messaggi
-      document.getElementById("sendMessageButton").onclick = () => sendMessage(chatName);
-    }
-
-    function sendMessage(chatName) {
-      const messageInput = document.getElementById("message-input");
-      const message = messageInput.value.trim();
-      const username = localStorage.getItem("username");
-      if (message) {
-        // Aggiungiamo il messaggio alla sottocollezione "messages" della chat
-        db.collection('chats').doc(chatName)
-          .collection('messages')
-          .add({
-            user: username,
-            message: message,
-            time: firebase.firestore.FieldValue.serverTimestamp()
-          })
-          .then(() => {
-            messageInput.value = ""; // pulisci il campo
-          })
-          .catch(error => {
-            console.error("Errore durante l'invio del messaggio:", error);
-          });
-      }
-    }
-
-    function backToList() {
-      // Ferma il listener della chat corrente
-      if (unsubscribe) {
-        unsubscribe();
-        unsubscribe = null;
-      }
-      document.getElementById("message-input-container").style.display = "none";
-      document.getElementById("chat-container").style.display = "flex";
-    }
-
-    // --- FUNZIONI DI GESTIONE DELLE CHAT PRIVATE (modifica/eliminazione) ---
-    function editPrivateChat(index) {
-      const privateChats = JSON.parse(localStorage.getItem("privateChats")) || [];
-      const chat = privateChats[index];
-      const newName = prompt("Modifica il nome della chat:", chat.name);
-      if (!newName) return; // annullato
-      const newPin = prompt("Modifica il PIN della chat:", chat.pin);
-      if (!newPin) return;
-      if (newName !== chat.name) {
-        // Se il nome cambia, puoi decidere come gestire i messaggi associati in Firestore:
-        // Per semplicità, in questo esempio non spostiamo i messaggi, ma potresti implementarli.
-        alert("Attenzione: se modifichi il nome, i messaggi precedenti non saranno trasferiti automaticamente.");
-      }
-      chat.name = newName;
-      chat.pin = newPin;
-      privateChats[index] = chat;
-      localStorage.setItem("privateChats", JSON.stringify(privateChats));
-      loadPrivateChats();
-    }
-
-    function deletePrivateChat(index) {
-      const privateChats = JSON.parse(localStorage.getItem("privateChats")) || [];
-      const chat = privateChats[index];
-      if (confirm("Sei sicuro di voler eliminare la chat privata?")) {
-        privateChats.splice(index, 1);
-        localStorage.setItem("privateChats", JSON.stringify(privateChats));
-        // Se desideri eliminare anche i messaggi da Firestore, dovrai farlo manualmente (vedi sotto)
-        // ATTENZIONE: l'eliminazione dei documenti in una sottocollezione richiede un'operazione di batch o una logica apposita.
-        loadPrivateChats();
-      }
-    }
-  </script>
+                loadMessages();
+                document.getElementById("message-input").value = "";  // Pulisci il campo input
+            }
+        }
+    </script>
 </body>
 </html>
