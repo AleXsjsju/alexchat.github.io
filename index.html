@@ -4,10 +4,89 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Dark Mode</title>
-    <link rel="stylesheet" href="styles.css">
-    <script defer src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-    <script defer src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
-    <script defer src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+    <script type="module">
+        // Importa i moduli Firebase necessari
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, orderBy, query, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        // Configura Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBxe1qJeusGmTVgKpU45EqwC1jeVdladVs",
+            authDomain: "freesnap-9ce29.firebaseapp.com",
+            projectId: "freesnap-9ce29",
+            storageBucket: "freesnap-9ce29.appspot.com",
+            messagingSenderId: "799602787383",
+            appId: "1:799602787383:web:a5a9fc7ad83ddf7ffc6bb2"
+        };
+
+        // Inizializza Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const correctPin = '1318'; // PIN fisso
+
+        // Quando l'utente clicca su "Avanti"
+        document.getElementById("nextButton").addEventListener("click", function () {
+            const username = document.getElementById("username").value.trim();
+            const pin = document.getElementById("pin").value.trim();
+
+            if (username && pin === correctPin) {
+                localStorage.setItem("username", username);
+                showChatInterface();
+            } else {
+                alert("PIN errato o nome non valido.");
+            }
+        });
+
+        // Mostra l'interfaccia della chat
+        function showChatInterface() {
+            document.getElementById("name-input-screen").style.display = "none";
+            document.getElementById("chat-container").style.display = "flex";
+            loadMessages();
+        }
+
+        // Carica i messaggi dalla Firestore
+        function loadMessages() {
+            const messagesContainer = document.getElementById("messages");
+            const chatRef = query(collection(db, "chatMessages"), orderBy("timestamp"));
+
+            onSnapshot(chatRef, (snapshot) => {
+                messagesContainer.innerHTML = "";
+                snapshot.forEach((doc) => {
+                    const msg = doc.data();
+                    const messageElement = document.createElement("div");
+                    messageElement.classList.add("message");
+
+                    const messageText = document.createElement("p");
+                    messageText.textContent = `${msg.user}: ${msg.message} - ${msg.time}`;
+                    messageElement.appendChild(messageText);
+
+                    messagesContainer.appendChild(messageElement);
+                });
+            });
+
+            document.getElementById("sendMessageButton").onclick = () => sendMessage();
+        }
+
+        // Invia un messaggio alla Firestore
+        function sendMessage() {
+            const message = document.getElementById("message-input").value.trim();
+            const username = localStorage.getItem("username");
+
+            if (message) {
+                const time = new Date().toLocaleTimeString();
+
+                addDoc(collection(db, "chatMessages"), {
+                    user: username,
+                    message: message,
+                    time: time,
+                    timestamp: serverTimestamp()
+                });
+
+                document.getElementById("message-input").value = "";  // Pulisci il campo input
+            }
+        }
+    </script>
     <style>
         body {
             background-color: #121212;
@@ -112,63 +191,5 @@
         <input type="text" id="message-input" placeholder="Scrivi un messaggio..." />
         <button id="sendMessageButton">Invia</button>
     </div>
-
-    <script>
-        const correctPin = '1318'; // PIN fisso
-
-        document.getElementById("nextButton").addEventListener("click", function () {
-            const username = document.getElementById("username").value.trim();
-            const pin = document.getElementById("pin").value.trim();
-
-            if (username && pin === correctPin) {
-                localStorage.setItem("username", username);
-                showChatInterface();
-            } else {
-                alert("PIN errato o nome non valido.");
-            }
-        });
-
-        function showChatInterface() {
-            document.getElementById("name-input-screen").style.display = "none";
-            document.getElementById("chat-container").style.display = "flex";
-            loadMessages();
-        }
-
-        function loadMessages() {
-            const messagesContainer = document.getElementById("messages");
-            const messages = JSON.parse(localStorage.getItem("chatMessages")) || [];
-
-            messagesContainer.innerHTML = "";
-
-            messages.forEach(msg => {
-                const messageElement = document.createElement("div");
-                messageElement.classList.add("message");
-
-                const messageText = document.createElement("p");
-                messageText.textContent = `${msg.user}: ${msg.message} - ${msg.time}`;
-                messageElement.appendChild(messageText);
-
-                messagesContainer.appendChild(messageElement);
-            });
-
-            document.getElementById("sendMessageButton").onclick = () => sendMessage();
-        }
-
-        function sendMessage() {
-            const message = document.getElementById("message-input").value.trim();
-            const username = localStorage.getItem("username");
-            if (message) {
-                const time = new Date().toLocaleTimeString();
-                const newMessage = { user: username, message, time };
-
-                let messages = JSON.parse(localStorage.getItem("chatMessages")) || [];
-                messages.push(newMessage);
-                localStorage.setItem("chatMessages", JSON.stringify(messages));
-
-                loadMessages();
-                document.getElementById("message-input").value = "";  // Pulisci il campo input
-            }
-        }
-    </script>
 </body>
 </html>
